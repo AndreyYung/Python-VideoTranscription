@@ -1,14 +1,23 @@
 from app.plugin_base import PluginBase
+from app.plugin_interface import PluginMetadata
 from pathlib import Path
 from PyQt6.QtWidgets import QMessageBox
 from app.translator import TranslationTask
 
 class TranslateAllLanguagesPlugin(PluginBase):
-    name = "Translate All Languages"
-    version = "1.0"
+    def __init__(self, main_window):
+        super().__init__(main_window)
+        self._metadata = PluginMetadata(
+            name="Translate All Languages",
+            version="1.0",
+            description="Плагин для автоматического перевода всех видео на доступные языки",
+            author="VideoTranscription Team",
+            category="Перевод"
+        )
 
-    def on_load(self):
-        super().on_load()
+    def on_load(self) -> bool:
+        if not super().on_load():
+            return False
 
         output_dir = self.main_window.config.get("output_dir")
         if not output_dir:
@@ -69,6 +78,7 @@ class TranslateAllLanguagesPlugin(PluginBase):
                 total_tasks += 1
 
         self.main_window.log_message("info", f"Плагин: Создано {total_tasks} задач перевода.")
+        return True
 
-    def on_unload(self):
-        super().on_unload()
+    def on_unload(self) -> bool:
+        return super().on_unload()

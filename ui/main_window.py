@@ -13,41 +13,8 @@ from app.config import AppConfig
 from .task_widget import VideoTaskWidget
 from .styles import AppTheme
 from USBKey import USBKey
-from app.plugin_base import PluginBase
-
-class PluginManager:
-    def __init__(self, main_window, plugin_dir="plugins"):
-        self.main_window = main_window
-        self.plugin_dir = Path(plugin_dir)
-        self.loaded_plugins = {}
-
-        if not self.plugin_dir.exists():
-            self.plugin_dir.mkdir(parents=True)
-
-    def load_plugin(self, plugin_path):
-        """Загружает плагин (.py файл) во время работы"""
-        try:
-            plugin_path = Path(plugin_path)
-            spec = importlib.util.spec_from_file_location(plugin_path.stem, plugin_path)
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[plugin_path.stem] = module
-            spec.loader.exec_module(module)
-
-            # Ищем класс, унаследованный от PluginBase
-            for attr in dir(module):
-                obj = getattr(module, attr)
-                if isinstance(obj, type) and issubclass(obj, PluginBase) and obj is not PluginBase:
-                    plugin_instance = obj(self.main_window)
-                    plugin_instance.on_load()
-                    self.loaded_plugins[plugin_path.stem] = plugin_instance
-                    print(f"[PLUGIN] {plugin_instance.name} загружен успешно.")
-                    return True
-
-            print(f"[PLUGIN] Не найден класс-наследник PluginBase в {plugin_path.name}")
-            return False
-        except Exception as e:
-            print(f"[PLUGIN ERROR] {e}")
-            return False
+from app.plugin_manager import PluginManager
+from .plugin_list_widget import PluginListWidget
 
 
 class MainWindow(QMainWindow):
@@ -87,6 +54,7 @@ class MainWindow(QMainWindow):
                 print("NO")
         #plugins
         self.plugin_manager = PluginManager(self)
+        self.plugin_list_widget = None
 
 
 
@@ -136,6 +104,12 @@ class MainWindow(QMainWindow):
         load_plugin_btn.setStyleSheet(AppTheme.SECONDARY_BUTTON_STYLE)
         load_plugin_btn.clicked.connect(self.load_plugin_dialog)
         tasks_header_layout.addWidget(load_plugin_btn)
+        
+        # --- Кнопка списка плагинов ---
+        plugins_btn = QPushButton("Список плагинов")
+        plugins_btn.setStyleSheet(AppTheme.SECONDARY_BUTTON_STYLE)
+        plugins_btn.clicked.connect(self.show_plugin_list_dialog)
+        tasks_header_layout.addWidget(plugins_btn)
 
         # --- Кнопка очистки ---
         clear_all_btn = QPushButton("Очистить все")
@@ -178,8 +152,75 @@ class MainWindow(QMainWindow):
             success = self.plugin_manager.load_plugin(file_path)
             if success:
                 QMessageBox.information(self, "Плагин", f"Плагин {Path(file_path).name} успешно загружен!")
+                # Обновляем список плагинов, если диалог открыт
+                if self.plugin_list_widget:
+                    self.update_plugin_list()
             else:
                 QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить плагин {Path(file_path).name}.")
+
+    def show_plugin_list_dialog(self):
+        """Показывает диалог со списком плагинов"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Список плагинов")
+        dialog.setModal(True)
+        dialog.resize(500, 400)
+        dialog.setStyleSheet(AppTheme.GLOBAL_STYLE)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Создаем виджет списка плагинов
+        self.plugin_list_widget = PluginListWidget()
+        self.plugin_list_widget.plugin_unload_requested.connect(self.unload_plugin)
+        
+        # Обновляем список плагинов
+        self.update_plugin_list()
+        
+        layout.addWidget(self.plugin_list_widget)
+        
+        # Кнопки
+        button_layout = QHBoxLayout()
+        
+        refresh_btn = QPushButton("Обновить")
+        refresh_btn.setStyleSheet(AppTheme.SECONDARY_BUTTON_STYLE)
+        refresh_btn.clicked.connect(self.update_plugin_list)
+        button_layout.addWidget(refresh_btn)
+        
+        button_layout.addStretch()
+        
+        close_btn = QPushButton("Закрыть")
+        close_btn.setStyleSheet(AppTheme.MAIN_BUTTON_STYLE)
+        close_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+        self.plugin_list_widget = None  # Сбрасываем ссылку после закрытия
+
+    def update_plugin_list(self):
+        """Обновляет список плагинов в виджете"""
+        if self.plugin_list_widget:
+            plugins = self.plugin_manager.get_plugin_list()
+            self.plugin_list_widget.update_plugin_list(plugins)
+
+    def unload_plugin(self, plugin_id: str):
+        """Выгружает плагин по ID"""
+        plugin_info = self.plugin_manager.get_plugin_info(plugin_id)
+        if plugin_info:
+            reply = QMessageBox.question(
+                self,
+                "Выгрузка плагина",
+                f"Вы уверены, что хотите выгрузить плагин '{plugin_info['name']}'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                success = self.plugin_manager.unload_plugin(plugin_id)
+                if success:
+                    self.log_message("info", f"Плагин '{plugin_info['name']}' успешно выгружен.")
+                    self.update_plugin_list()
+                else:
+                    QMessageBox.warning(self, "Ошибка", f"Не удалось выгрузить плагин '{plugin_info['name']}'.")
 
     def _create_drop_area(self):
         drop_area = QLabel("Перетащите видео файлы сюда\nили нажмите для выбора")
@@ -513,6 +554,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.save_settings()
+        # Выгружаем все плагины при закрытии
+        self.plugin_manager.unload_all_plugins()
         self.worker.stop()
         self.translator.stop()
         self.worker.wait()

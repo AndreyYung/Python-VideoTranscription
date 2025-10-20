@@ -1,13 +1,22 @@
 from app.plugin_base import PluginBase
+from app.plugin_interface import PluginMetadata
 from PyQt6.QtWidgets import QMessageBox
 from pathlib import Path
 
 class CountVideoFilesPlugin(PluginBase):
-    name = "Count Video Files"
-    version = "1.0"
+    def __init__(self, main_window):
+        super().__init__(main_window)
+        self._metadata = PluginMetadata(
+            name="Count Video Files",
+            version="1.0",
+            description="Плагин для подсчета количества видео файлов в папке сохранения",
+            author="VideoTranscription Team",
+            category="Анализ"
+        )
 
-    def on_load(self):
-        super().on_load()
+    def on_load(self) -> bool:
+        if not super().on_load():
+            return False
         output_dir = self.main_window.config.get("output_dir")
         if not output_dir:
             self.main_window.log_message("warning", "Плагин: Папка для сохранения не выбрана.")
@@ -27,6 +36,7 @@ class CountVideoFilesPlugin(PluginBase):
             f"В папке '{output_dir}' найдено {len(video_files)} видео файлов."
         )
         self.main_window.log_message("info", f"Плагин: Найдено {len(video_files)} видео файлов.")
+        return True
 
-    def on_unload(self):
-        super().on_unload()
+    def on_unload(self) -> bool:
+        return super().on_unload()

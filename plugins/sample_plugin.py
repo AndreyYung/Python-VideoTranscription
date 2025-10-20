@@ -1,14 +1,23 @@
 from app.plugin_base import PluginBase
+from app.plugin_interface import PluginMetadata
 from PyQt6.QtWidgets import QMessageBox
 from pathlib import Path
 import os
 
 class SamplePlugin(PluginBase):
-    name = "Cleanup Plugin"
-    version = "1.0"
+    def __init__(self, main_window):
+        super().__init__(main_window)
+        self._metadata = PluginMetadata(
+            name="Cleanup Plugin",
+            version="1.0",
+            description="Плагин для очистки .txt файлов в папке сохранения",
+            author="VideoTranscription Team",
+            category="Утилиты"
+        )
 
-    def on_load(self):
-        super().on_load()
+    def on_load(self) -> bool:
+        if not super().on_load():
+            return False
 
         output_dir = self.main_window.config.get("output_dir")
         if not output_dir:
@@ -40,6 +49,8 @@ class SamplePlugin(PluginBase):
             self.main_window.log_message("info", f"Плагин: Удалено {deleted_files} .txt файлов из {output_dir}.")
         else:
             self.main_window.log_message("info", "Плагин: Удаление файлов отменено пользователем.")
+        
+        return True
 
-    def on_unload(self):
-        super().on_unload()
+    def on_unload(self) -> bool:
+        return super().on_unload()
