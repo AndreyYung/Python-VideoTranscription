@@ -11,7 +11,8 @@ class PluginBase(PluginInterface):
             version="1.0",
             description="Базовый плагин без описания",
             author="Unknown",
-            category="Общие"
+            category="Общие",
+            guid = "123123123123"
         )
 
     @property

@@ -12,7 +12,8 @@ class SamplePlugin(PluginBase):
             version="1.0",
             description="Плагин для очистки .txt файлов в папке сохранения",
             author="VideoTranscription Team",
-            category="Утилиты"
+            category="Утилиты",
+            guid="123456789092"
         )
 
     def on_load(self) -> bool:

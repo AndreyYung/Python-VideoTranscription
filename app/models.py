@@ -25,3 +25,8 @@ class TranscriptionTask:
     device: str = "cpu"
     use_g4f_correction: bool = True
     g4f_model: str = "gpt-4o-mini"
+    # OCR режим
+    use_ocr_mode: bool = False
+    ocr_engine: str = "tesseract"  # tesseract, easyocr
+    subtitle_region: Optional[tuple] = None  # (x, y, width, height) для области субтитров
+    ocr_language: str = "eng"  # язык для OCR

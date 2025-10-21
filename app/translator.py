@@ -5,7 +5,7 @@ from queue import Queue, Empty
 from PyQt6.QtCore import QThread, pyqtSignal
 import srt
 
-from .g4f_client import g4f_batch_translate
+from app.g4f_client import g4f_batch_translate
 
 
 class TranslationTask(tuple):
