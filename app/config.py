@@ -15,7 +15,12 @@ class AppConfig:
             "translate_lang": "en",
             "use_g4f_correction": True,
             "use_g4f_translation": True,
-            "g4f_model": "gpt-4o-mini"
+            "g4f_model": "gpt-4o-mini",
+            # OCR настройки
+            "use_ocr_mode": False,
+            "ocr_engine": "tesseract",
+            "ocr_language": "eng",
+            "subtitle_region": (0, 0, 1920, 200)
         }
         self.settings = self.load_config()
 

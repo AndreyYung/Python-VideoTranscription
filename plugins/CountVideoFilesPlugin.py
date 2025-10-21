@@ -12,6 +12,7 @@ class CountVideoFilesPlugin(PluginBase):
             description="Плагин для подсчета количества видео файлов в папке сохранения",
             author="VideoTranscription Team",
             category="Анализ"
+
         )
 
     def on_load(self) -> bool:

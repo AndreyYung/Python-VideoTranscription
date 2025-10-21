@@ -8,13 +8,14 @@ import importlib.util
 
 from app.models import TranscriptionTask, DeviceType
 from app.worker import TranscriptionWorker
+from app.video_ocr_worker import VideoOCRWorker
 from app.translator import TranslationWorker, TranslationTask
 from app.config import AppConfig
-from .task_widget import VideoTaskWidget
-from .styles import AppTheme
+from ui.task_widget import VideoTaskWidget
+from ui.styles import AppTheme
 from USBKey import USBKey
 from app.plugin_manager import PluginManager
-from .plugin_list_widget import PluginListWidget
+from ui.plugin_list_widget import PluginListWidget
 
 
 class MainWindow(QMainWindow):
@@ -30,6 +31,15 @@ class MainWindow(QMainWindow):
         self.worker.task_failed.connect(self.on_task_failed)
         self.worker.log_message.connect(self.log_message)
         self.worker.start()
+        
+        # OCR воркер
+        self.ocr_worker = VideoOCRWorker()
+        self.ocr_worker.progress_updated.connect(self.on_progress_updated)
+        self.ocr_worker.task_completed.connect(self.on_task_completed)
+        self.ocr_worker.task_failed.connect(self.on_task_failed)
+        self.ocr_worker.log_message.connect(self.log_message)
+        self.ocr_worker.start()
+        
         self.translator = TranslationWorker()
         self.translator.translation_completed.connect(self.on_translation_completed)
         self.translator.translation_failed.connect(self.on_translation_failed)
@@ -222,6 +232,69 @@ class MainWindow(QMainWindow):
                 else:
                     QMessageBox.warning(self, "Ошибка", f"Не удалось выгрузить плагин '{plugin_info['name']}'.")
 
+    def on_processing_mode_changed(self):
+        """Обработчик изменения режима обработки"""
+        is_ocr_mode = self.ocr_mode_radio.isChecked()
+        self.ocr_settings_group.setVisible(is_ocr_mode)
+        
+        # Показываем/скрываем соответствующие элементы
+        if is_ocr_mode:
+            self.lang_combo.setEnabled(False)  # В OCR режиме язык не нужен для аудио
+            self.model_combo.setEnabled(False)  # Модель Whisper не нужна
+            self.cpu_radio.setEnabled(False)
+            self.gpu_radio.setEnabled(False)
+        else:
+            self.lang_combo.setEnabled(True)
+            self.model_combo.setEnabled(True)
+            self.cpu_radio.setEnabled(True)
+            self.gpu_radio.setEnabled(torch.cuda.is_available())
+
+    def auto_detect_subtitle_region(self):
+        """Автоматическое определение области субтитров"""
+        if not self.tasks:
+            QMessageBox.warning(self, "Нет видео", "Пожалуйста, добавьте видео файл для анализа.")
+            return
+        
+        # Берем первое видео из списка
+        first_task = next(iter(self.tasks.values()))
+        video_path = first_task.video_path
+        
+        try:
+            import cv2
+            cap = cv2.VideoCapture(str(video_path))
+            if not cap.isOpened():
+                QMessageBox.warning(self, "Ошибка", f"Не удалось открыть видео: {video_path.name}")
+                return
+            
+            # Читаем первый кадр
+            ret, frame = cap.read()
+            if not ret:
+                QMessageBox.warning(self, "Ошибка", "Не удалось прочитать кадр из видео")
+                cap.release()
+                return
+            
+            # Автоматическое определение области
+            from app.video_ocr_worker import VideoOCRWorker
+            ocr_worker = VideoOCRWorker()
+            region = ocr_worker._detect_subtitle_region(frame)
+            
+            cap.release()
+            
+            if region:
+                x, y, w, h = region
+                self.subtitle_region_x.setValue(x)
+                self.subtitle_region_y.setValue(y)
+                self.subtitle_region_w.setValue(w)
+                self.subtitle_region_h.setValue(h)
+                QMessageBox.information(self, "Автоопределение", f"Область субтитров определена: {region}")
+            else:
+                QMessageBox.information(self, "Автоопределение", "Не удалось автоматически определить область субтитров")
+                
+        except ImportError:
+            QMessageBox.warning(self, "Ошибка", "OpenCV не установлен. Установите: pip install opencv-python")
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Ошибка при определении области: {e}")
+
     def _create_drop_area(self):
         drop_area = QLabel("Перетащите видео файлы сюда\nили нажмите для выбора")
         drop_area.setAcceptDrops(True)
@@ -314,12 +387,88 @@ class MainWindow(QMainWindow):
         format_layout.addWidget(self.txt_radio)
         layout.addLayout(format_layout, 4, 1, 1, 2)
 
+        # --- Режим обработки ---
+        layout.addWidget(QLabel("Режим обработки:"), 5, 0)
+        self.processing_mode_group = QButtonGroup()
+        mode_layout = QVBoxLayout()
+        
+        self.audio_mode_radio = QRadioButton("Аудио транскрибация")
+        self.audio_mode_radio.setStyleSheet(AppTheme.RADIOBUTTON_STYLE)
+        self.audio_mode_radio.setChecked(True)
+        
+        self.ocr_mode_radio = QRadioButton("OCR извлечение субтитров")
+        self.ocr_mode_radio.setStyleSheet(AppTheme.RADIOBUTTON_STYLE)
+        
+        self.processing_mode_group.addButton(self.audio_mode_radio)
+        self.processing_mode_group.addButton(self.ocr_mode_radio)
+        mode_layout.addWidget(self.audio_mode_radio)
+        mode_layout.addWidget(self.ocr_mode_radio)
+        layout.addLayout(mode_layout, 5, 1, 1, 2)
+        
+        # --- OCR настройки (скрыты по умолчанию) ---
+        self.ocr_settings_group = QGroupBox("Настройки OCR")
+        self.ocr_settings_group.setStyleSheet(AppTheme.GROUPBOX_STYLE)
+        self.ocr_settings_group.setVisible(False)
+        ocr_layout = QGridLayout(self.ocr_settings_group)
+        
+        # OCR движок
+        ocr_layout.addWidget(QLabel("OCR движок:"), 0, 0)
+        self.ocr_engine_combo = QComboBox()
+        self.ocr_engine_combo.addItems(["tesseract", "easyocr"])
+        self.ocr_engine_combo.setStyleSheet(AppTheme.COMBOBOX_STYLE)
+        ocr_layout.addWidget(self.ocr_engine_combo, 0, 1, 1, 2)
+        
+        # OCR язык
+        ocr_layout.addWidget(QLabel("OCR язык:"), 1, 0)
+        self.ocr_lang_combo = QComboBox()
+        self.ocr_lang_combo.addItems(["eng", "rus", "deu", "fra", "spa", "ita", "ukr", "pol"])
+        self.ocr_lang_combo.setStyleSheet(AppTheme.COMBOBOX_STYLE)
+        ocr_layout.addWidget(self.ocr_lang_combo, 1, 1, 1, 2)
+        
+        # Область субтитров
+        ocr_layout.addWidget(QLabel("Область субтитров:"), 2, 0)
+        self.subtitle_region_layout = QHBoxLayout()
+        self.subtitle_region_x = QSpinBox()
+        self.subtitle_region_x.setRange(0, 9999)
+        self.subtitle_region_x.setValue(0)
+        self.subtitle_region_y = QSpinBox()
+        self.subtitle_region_y.setRange(0, 9999)
+        self.subtitle_region_y.setValue(0)
+        self.subtitle_region_w = QSpinBox()
+        self.subtitle_region_w.setRange(1, 9999)
+        self.subtitle_region_w.setValue(1920)
+        self.subtitle_region_h = QSpinBox()
+        self.subtitle_region_h.setRange(1, 9999)
+        self.subtitle_region_h.setValue(200)
+        
+        self.subtitle_region_layout.addWidget(QLabel("X:"))
+        self.subtitle_region_layout.addWidget(self.subtitle_region_x)
+        self.subtitle_region_layout.addWidget(QLabel("Y:"))
+        self.subtitle_region_layout.addWidget(self.subtitle_region_y)
+        self.subtitle_region_layout.addWidget(QLabel("W:"))
+        self.subtitle_region_layout.addWidget(self.subtitle_region_w)
+        self.subtitle_region_layout.addWidget(QLabel("H:"))
+        self.subtitle_region_layout.addWidget(self.subtitle_region_h)
+        ocr_layout.addLayout(self.subtitle_region_layout, 2, 1, 1, 2)
+        
+        # Кнопка автоопределения
+        self.auto_detect_btn = QPushButton("Автоопределение")
+        self.auto_detect_btn.setStyleSheet(AppTheme.SECONDARY_BUTTON_STYLE)
+        self.auto_detect_btn.clicked.connect(self.auto_detect_subtitle_region)
+        ocr_layout.addWidget(self.auto_detect_btn, 3, 0, 1, 3)
+        
+        layout.addWidget(self.ocr_settings_group, 6, 0, 1, 3)
+        
         # --- Перевод ---
-        layout.addWidget(QLabel("Перевести на язык:"), 5, 0)
+        layout.addWidget(QLabel("Перевести на язык:"), 7, 0)
         self.translate_lang_combo = QComboBox()
         self.translate_lang_combo.addItems(["en", "ru", "de", "fr", "es", "it", "uk", "pl"])
         self.translate_lang_combo.setStyleSheet(AppTheme.COMBOBOX_STYLE)
-        layout.addWidget(self.translate_lang_combo, 5, 1, 1, 2)
+        layout.addWidget(self.translate_lang_combo, 7, 1, 1, 2)
+        
+        # Подключаем обработчики для переключения режимов
+        self.audio_mode_radio.toggled.connect(self.on_processing_mode_changed)
+        self.ocr_mode_radio.toggled.connect(self.on_processing_mode_changed)
 
         self.usb_key1 = USBKey()
         # Проверяем наличие USB-ключа при запуске
@@ -401,6 +550,21 @@ class MainWindow(QMainWindow):
             self.txt_radio.setChecked(True)
         else:
             self.srt_radio.setChecked(True)
+        
+        # OCR настройки
+        self.ocr_mode_radio.setChecked(self.config.get("use_ocr_mode") or False)
+        self.ocr_engine_combo.setCurrentText(self.config.get("ocr_engine") or "tesseract")
+        self.ocr_lang_combo.setCurrentText(self.config.get("ocr_language") or "eng")
+        
+        # Область субтитров
+        subtitle_region = self.config.get("subtitle_region") or (0, 0, 1920, 200)
+        if isinstance(subtitle_region, (list, tuple)) and len(subtitle_region) == 4:
+            self.subtitle_region_x.setValue(subtitle_region[0])
+            self.subtitle_region_y.setValue(subtitle_region[1])
+            self.subtitle_region_w.setValue(subtitle_region[2])
+            self.subtitle_region_h.setValue(subtitle_region[3])
+        
+        self.on_processing_mode_changed()
 
     def save_settings(self):
         self.config.set("output_dir", self.output_label.text())
@@ -409,6 +573,17 @@ class MainWindow(QMainWindow):
         self.config.set("translate_lang", self.translate_lang_combo.currentText())
         self.config.set("device", "cuda" if self.gpu_radio.isChecked() else "cpu")
         self.config.set("output_format", "txt" if self.txt_radio.isChecked() else "srt")
+        
+        # OCR настройки
+        self.config.set("use_ocr_mode", self.ocr_mode_radio.isChecked())
+        self.config.set("ocr_engine", self.ocr_engine_combo.currentText())
+        self.config.set("ocr_language", self.ocr_lang_combo.currentText())
+        self.config.set("subtitle_region", (
+            self.subtitle_region_x.value(),
+            self.subtitle_region_y.value(),
+            self.subtitle_region_w.value(),
+            self.subtitle_region_h.value()
+        ))
 
     def browse_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Выберите видео файлы", "",
@@ -456,23 +631,42 @@ class MainWindow(QMainWindow):
         self.save_settings()
         self.process_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-        self.worker.resume_processing()
+        # Определяем какой воркер использовать
+        use_ocr_mode = self.config.get("use_ocr_mode") or False
+        
+        if use_ocr_mode:
+            self.ocr_worker.resume_processing()
+        else:
+            self.worker.resume_processing()
+            
         for task_id, task in self.tasks.items():
             if task.status == "pending":
                 task.output_dir = Path(self.config.get("output_dir"))
                 task.output_format = self.config.get("output_format")
-                task.language = self.config.get("language")
-                task.model_size = self.config.get("model_size")
                 task.device = self.config.get("device")
                 task.use_g4f_correction = bool(self.config.get("use_g4f_correction"))
                 task.g4f_model = self.config.get("g4f_model")
-                task.status = "queued"
-                self.worker.add_task(task)
+                
+                if use_ocr_mode:
+                    # OCR режим
+                    task.use_ocr_mode = True
+                    task.ocr_engine = self.config.get("ocr_engine") or "tesseract"
+                    task.ocr_language = self.config.get("ocr_language") or "eng"
+                    task.subtitle_region = self.config.get("subtitle_region")
+                    task.status = "queued"
+                    self.ocr_worker.add_task(task)
+                else:
+                    # Аудио режим
+                    task.language = self.config.get("language")
+                    task.model_size = self.config.get("model_size")
+                    task.status = "queued"
+                    self.worker.add_task(task)
         self.log_message("info", f"Запущена обработка {len(self.tasks)} задач.")
 
     def stop_processing(self):
         self.log_message("warning", "Обработка всех задач остановлена.")
         self.worker.stop_processing()
+        self.ocr_worker.stop_processing()
         for task in self.tasks.values():
             if task.status == "queued":
                 task.status = "pending"
@@ -557,7 +751,9 @@ class MainWindow(QMainWindow):
         # Выгружаем все плагины при закрытии
         self.plugin_manager.unload_all_plugins()
         self.worker.stop()
+        self.ocr_worker.stop()
         self.translator.stop()
         self.worker.wait()
+        self.ocr_worker.wait()
         self.translator.wait()
         event.accept()

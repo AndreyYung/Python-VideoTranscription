@@ -1,0 +1,34 @@
+# Дополнительные зависимости для OCR функциональности
+# Установите эти пакеты для использования режима извлечения субтитров из видео
+
+# OpenCV для обработки видео
+opencv-python>=4.8.0
+
+# Tesseract OCR
+pytesseract>=0.3.10
+
+# EasyOCR как альтернативный OCR движок
+easyocr>=1.7.0
+
+# NumPy для работы с массивами (обычно уже установлен)
+numpy>=1.21.0
+
+# Установка Tesseract OCR движка:
+# Windows: скачайте с https://github.com/UB-Mannheim/tesseract/wiki
+# Ubuntu/Debian: sudo apt-get install tesseract-ocr
+# macOS: brew install tesseract
+
+# Дополнительные языковые пакеты для Tesseract:
+# Windows: tesseract-ocr-{язык}
+# Ubuntu/Debian: tesseract-ocr-{язык}
+# macOS: tesseract-lang
+
+# Поддерживаемые языки для Tesseract:
+# eng - английский
+# rus - русский  
+# deu - немецкий
+# fra - французский
+# spa - испанский
+# ita - итальянский
+# ukr - украинский
+# pol - польский
