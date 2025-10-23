@@ -16,8 +16,6 @@ class ExamplePlugin(PluginBase):
             author="Development Team",
             category="Демо",
             dependencies=["PyQt6", "pathlib"],
-            icon_path=None,
-            guid = "123123123123"
         )
 
     def on_load(self) -> bool:
@@ -59,7 +57,6 @@ class ExamplePlugin(PluginBase):
         """Вызывается при выгрузке плагина"""
         self.main_window.log_message("info", "Пример плагина: Выгружается...")
         return super().on_unload()
-
 
 
 
