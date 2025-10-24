@@ -13,7 +13,7 @@ class SamplePlugin(PluginBase):
             description="Плагин для очистки .txt файлов в папке сохранения",
             author="VideoTranscription Team",
             category="Утилиты",
-            guid="123456789092"
+            guid="550e8400-e29b-41d4-a716-446655440001"
         )
 
     def on_load(self) -> bool:

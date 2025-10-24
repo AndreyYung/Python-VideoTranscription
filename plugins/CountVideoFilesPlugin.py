@@ -12,7 +12,7 @@ class CountVideoFilesPlugin(PluginBase):
             description="Плагин для подсчета количества видео файлов в папке сохранения",
             author="VideoTranscription Team",
             category="Анализ",
-            guid = "111111111111"
+            guid = "550e8400-e29b-41d4-a716-446655440033"
 
         )
 

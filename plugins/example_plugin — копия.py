@@ -17,7 +17,7 @@ class ExamplePlugin(PluginBase):
             category="Демо",
             dependencies=["PyQt6", "pathlib"],
             icon_path=None,
-            guid = "123123123123"
+            guid = "550e8400-e29b-41d4-a716-446655440008"
         )
 
     def on_load(self) -> bool:

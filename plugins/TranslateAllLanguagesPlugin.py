@@ -13,7 +13,7 @@ class TranslateAllLanguagesPlugin(PluginBase):
             description="Плагин для автоматического перевода всех видео на доступные языки",
             author="VideoTranscription Team",
             category="Перевод",
-            guid="123456789000"
+            guid="550e8400-e29b-41d4-a716-446655440000"
         )
 
     def on_load(self) -> bool:
