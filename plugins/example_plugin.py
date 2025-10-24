@@ -16,6 +16,7 @@ class ExamplePlugin(PluginBase):
             author="Development Team",
             category="Демо",
             dependencies=["PyQt6", "pathlib"],
+            guid = "333444555352"
         )
 
     def on_load(self) -> bool:
