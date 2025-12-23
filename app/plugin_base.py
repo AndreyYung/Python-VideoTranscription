@@ -3,7 +3,7 @@ from .plugin_interface import PluginInterface, PluginMetadata
 
 class PluginBase(PluginInterface):
     """Базовый класс для всех плагинов приложения"""
-    
+
     def __init__(self, main_window):
         self.main_window = main_window
         self._metadata = PluginMetadata(
@@ -12,7 +12,7 @@ class PluginBase(PluginInterface):
             description="Базовый плагин без описания",
             author="Unknown",
             category="Общие",
-            guid = "123123123123"
+            guid="123123123123"
         )
 
     @property
@@ -20,7 +20,6 @@ class PluginBase(PluginInterface):
         return self._metadata
 
     def on_load(self) -> bool:
-        """Базовая реализация загрузки плагина"""
         try:
             print(f"[PLUGIN] {self.metadata.name} v{self.metadata.version} загружен")
             return True
@@ -29,10 +28,14 @@ class PluginBase(PluginInterface):
             return False
 
     def on_unload(self) -> bool:
-        """Базовая реализация выгрузки плагина"""
         try:
             print(f"[PLUGIN] {self.metadata.name} выгружен")
             return True
         except Exception as e:
             print(f"[PLUGIN ERROR] Ошибка выгрузки {self.metadata.name}: {e}")
             return False
+
+    def run(self):
+        """Метод запуска плагина вручную"""
+        print(f"[PLUGIN] {self.metadata.name} run() вызван")
+        # Любой код плагина здесь

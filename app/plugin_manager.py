@@ -141,6 +141,18 @@ class PluginManager:
         for plugin_id in list(self.loaded_plugins.keys()):
             self.unload_plugin(plugin_id)
 
+    def run_plugin(self, plugin_id: str):
+        """Запуск плагина вручную"""
+        plugin = self.loaded_plugins.get(plugin_id)
+        try:
+            plugin.run()
+            print(f"[PLUGIN] {plugin.metadata.name} запущен.")
+            self.main_window.log_message("success", f"Плагин '{plugin.metadata.name}' успешно запущен.")
+        except Exception as e:
+            print(f"[PLUGIN ERROR] Ошибка при запуске плагина {plugin.metadata.name}: {e}")
+            self.main_window.log_message("error", f"Ошибка при запуске плагина '{plugin.metadata.name}': {e}")
+
+
     def reload_plugin(self, plugin_path: str) -> bool:
         """Перезагружает плагин"""
         # Сначала находим и выгружаем старую версию, если она есть

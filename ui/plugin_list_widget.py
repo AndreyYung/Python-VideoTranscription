@@ -7,7 +7,9 @@ from .styles import AppTheme
 
 class PluginListWidget(QWidget):
     """Виджет для отображения списка загруженных плагинов"""
-    
+    plugin_unload_requested = pyqtSignal(str)  # plugin_id
+    plugin_run_requested = pyqtSignal(str)  # plugin_id для запуска
+
     plugin_unload_requested = pyqtSignal(str)  # plugin_id
     
     def __init__(self, parent=None):
@@ -110,7 +112,7 @@ class PluginListWidget(QWidget):
         for plugin in plugins:
             plugin_widget = self.create_plugin_widget(plugin)
             self.plugins_layout.addWidget(plugin_widget)
-    
+
     def create_plugin_widget(self, plugin_info: Dict[str, Any]) -> QWidget:
         """Создает виджет для отображения информации о плагине"""
         widget = QWidget()
@@ -125,14 +127,14 @@ class PluginListWidget(QWidget):
                 border-color: {AppTheme.ACCENT};
             }}
         """)
-        
+
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(4)
-        
+
         # Заголовок с именем и версией
         header_layout = QHBoxLayout()
-        
+
         name_label = QLabel(plugin_info["name"])
         name_label.setStyleSheet(f"""
             font-size: 13px;
@@ -140,7 +142,7 @@ class PluginListWidget(QWidget):
             color: {AppTheme.TEXT_PRIMARY};
         """)
         header_layout.addWidget(name_label)
-        
+
         version_label = QLabel(f"v{plugin_info['version']}")
         version_label.setStyleSheet(f"""
             font-size: 11px;
@@ -150,9 +152,32 @@ class PluginListWidget(QWidget):
             border-radius: 3px;
         """)
         header_layout.addWidget(version_label)
-        
+
         header_layout.addStretch()
-        
+
+        # Кнопка запуска плагина
+        run_btn = QPushButton("▶️")
+        run_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {AppTheme.ACCENT};
+                color: white;
+                border: none;
+                border-radius: 3px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 2px 6px;
+                min-width: 20px;
+                max-width: 20px;
+            }}
+            QPushButton:hover {{
+                background-color: #3399ff;
+            }}
+        """)
+        run_btn.setToolTip("Запустить плагин")
+        plugin_id = plugin_info["id"]
+        run_btn.clicked.connect(lambda _, pid=plugin_id: self.plugin_run_requested.emit(pid))
+        header_layout.addWidget(run_btn)
+
         # Кнопка выгрузки
         unload_btn = QPushButton("✕")
         unload_btn.setStyleSheet(f"""
@@ -174,9 +199,9 @@ class PluginListWidget(QWidget):
         unload_btn.setToolTip("Выгрузить плагин")
         unload_btn.clicked.connect(lambda: self.plugin_unload_requested.emit(plugin_info["id"]))
         header_layout.addWidget(unload_btn)
-        
+
         layout.addLayout(header_layout)
-        
+
         # Описание
         if plugin_info.get("description"):
             desc_label = QLabel(plugin_info["description"])
@@ -187,7 +212,7 @@ class PluginListWidget(QWidget):
             """)
             desc_label.setWordWrap(True)
             layout.addWidget(desc_label)
-        
+
         # Автор
         if plugin_info.get("author"):
             author_label = QLabel(f"Автор: {plugin_info['author']}")
@@ -197,7 +222,7 @@ class PluginListWidget(QWidget):
                 font-style: italic;
             """)
             layout.addWidget(author_label)
-        
+
         # Зависимости
         if plugin_info.get("dependencies"):
             deps_text = ", ".join(plugin_info["dependencies"])
@@ -208,9 +233,9 @@ class PluginListWidget(QWidget):
             """)
             deps_label.setWordWrap(True)
             layout.addWidget(deps_label)
-        
+
         return widget
-    
+
     def clear_plugin_list(self):
         """Очищает список плагинов"""
         while self.plugins_layout.count():

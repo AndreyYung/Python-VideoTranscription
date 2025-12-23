@@ -17,9 +17,23 @@ class TranslateAllLanguagesPlugin(PluginBase):
         )
 
     def on_load(self) -> bool:
+        """Проверка условий при загрузке плагина"""
         if not super().on_load():
             return False
 
+        output_dir = self.main_window.config.get("output_dir")
+        if not output_dir:
+            self.main_window.log_message("warning", "Плагин: Папка для сохранения не выбрана.")
+        else:
+            output_path = Path(output_dir)
+            if not output_path.exists():
+                self.main_window.log_message("warning", f"Плагин: Папка {output_dir} не существует.")
+
+        self.main_window.log_message("info", "Плагин Translate All Languages готов к запуску")
+        return True
+
+    def run(self):
+        """Метод запуска плагина при нажатии кнопки 'Запуск'"""
         output_dir = self.main_window.config.get("output_dir")
         if not output_dir:
             self.main_window.log_message("warning", "Плагин: Папка для сохранения не выбрана.")
@@ -60,7 +74,6 @@ class TranslateAllLanguagesPlugin(PluginBase):
             task = next((t for t in self.main_window.tasks.values()
                          if t.video_path.name == video_file.name), None)
             if not task:
-                # Если задача ещё не существует, создаём её
                 self.main_window.log_message("warning", f"Плагин: Видео {video_file.name} ещё не обработано.")
                 continue
 
@@ -79,7 +92,6 @@ class TranslateAllLanguagesPlugin(PluginBase):
                 total_tasks += 1
 
         self.main_window.log_message("info", f"Плагин: Создано {total_tasks} задач перевода.")
-        return True
 
     def on_unload(self) -> bool:
         return super().on_unload()
