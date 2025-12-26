@@ -832,10 +832,20 @@ class MainWindow(QMainWindow):
             selector = SubtitleAreaSelector(pixmap, parent=self)
             if selector.exec() == QDialog.DialogCode.Accepted:
                 rect = selector.selected_rect
-                self.subtitle_region_x.setValue(rect.x())
-                self.subtitle_region_y.setValue(rect.y())
+                if not (rect.x() - 150 <= 0):
+                    self.subtitle_region_x.setValue(rect.x())
+                else:
+                    self.subtitle_region_x.setValue(rect.x()-150)
+                if not (rect.y() - 150 <= 0):
+                    self.subtitle_region_y.setValue(rect.y())
+                else:
+                    self.subtitle_region_y.setValue(rect.y() - 150)
+
                 self.subtitle_region_w.setValue(rect.width())
-                self.subtitle_region_h.setValue(rect.height())
+                try:
+                    self.subtitle_region_h.setValue(rect.height() + 150)
+                except:
+                    self.subtitle_region_h.setValue(rect.height())
 
         except Exception as e:
             print("[FATAL] select_subtitle_area_handler:", e)
